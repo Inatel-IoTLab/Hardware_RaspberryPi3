@@ -167,7 +167,121 @@ Depois desses comandos a instalação do Paho-MQTT está feita e pronta para ser
 Nessa parte já vamos usar um código pronto, apenas abra o python no Raspberry, crie uma nova janela e digite o seguinte código:
 
 ```js
-CÓDIGO
+import paho.mqtt.client as paho
+from time import gmtime, strftime
+
+def rc_answers_to_strings(argument):
+    switcher = {
+        0: "Connection successful",
+        1: "Connection refused - incorrect protocol version",
+        2: "Connection refused - invalid client identifier",
+        3: "Connection refused - server unavailable",
+        4: "Connection refused - bad username or password",
+        5: "Connection refused - not authorised",
+        6-255: "Currently unused",
+    }
+    return switcher.get(argument, "nothing")
+
+def OnConnectHandler(client, userdata, flags, rc):
+        print(rc_answers_to_strings(rc))
+        
+        topic="icc_nmc"
+        qos = 1
+        
+        print("Subscribing to the topic %s with QoS %d" %(topic,qos))
+        client.subscribe(topic, qos)
+
+
+def OnDisconnecthandler(client, userdata, rc): 
+#       called when the client disconnects from the broker.
+#       The rc parameter indicates the disconnection state. If MQTT_ERR_SUCCESS
+#       (0), the callback was called in response to a disconnect() call. If any
+#       other value the disconnection was unexpected, such as might be caused by
+#       a network error.
+    print("Disconnection returned" + str(rc))
+
+def OnMessageHandler(client, userdata, message): 
+#     called when a message has been received on a
+#     topic that the client subscribes to. The message variable is a
+#     MQTTMessage that describes all of the message parameters.
+    print("###################################")
+    print("New message received:")
+    print("Topic: " + str(message.topic))
+    print("QoS: " + str(message.qos))
+    print("Payload: " + str(message.payload))
+    print("###################################")
+
+def OnPublishHandler(client, userdata, mid): 
+#       called when a message that was to be sent using the
+#       publish() call has completed transmission to the broker. For messages
+#       with QoS levels 1 and 2, this means that the appropriate handshakes have
+#       completed. For QoS 0, this simply means that the message has left the
+#       client. The mid variable matches the mid variable returned from the
+#       corresponding publish() call, to allow outgoing messages to be tracked.
+#       This callback is important because even if the publish() call returns
+#       success, it does not always mean that the message has been sent.
+    print("Publish approved!")
+
+def OnSubscribeHandler(client, userdata, mid, granted_qos): 
+#       called when the broker responds to a
+#       subscribe request. The mid variable matches the mid variable returned
+#       from the corresponding subscribe() call. The granted_qos variable is a
+#       list of integers that give the QoS level the broker has granted for each
+#       of the different subscription requests.
+    print("Subscribe successful with QoS: " + str(granted_qos))
+
+def OnUnsubscribeHandler(client, userdata, mid): 
+#     called when the broker responds to an unsubscribe
+#       request. The mid variable matches the mid variable returned from the
+#       corresponding unsubscribe() call.
+    print("Unsubscription returned ")
+
+def OnLogHandler(client, userdata, level, buf): 
+#     called when the client has log information. Define
+#       to allow debugging. The level variable gives the severity of the message
+#       and will be one of MQTT_LOG_INFO, MQTT_LOG_NOTICE, MQTT_LOG_WARNING,
+#       MQTT_LOG_ERR, and MQTT_LOG_DEBUG. The message itself is in buf.
+    print("Log: " + str(buf))
+
+
+if __name__ == '__main__':
+    
+    client = paho.Client()
+    
+    client.on_connect = OnConnectHandler
+    client.on_disconnect = OnDisconnecthandler
+    client.on_message = OnMessageHandler
+    client.on_subscribe = OnSubscribeHandler
+    client.on_publish = OnPublishHandler
+    
+    host="iot.eclipse.org"
+    port = 1883
+    keepalive=60
+    bind_address=""
+    
+    print("Trying to connect to %s" %host)
+    
+    client.connect(host, port, keepalive, bind_address)
+    
+    topic = "raspberry"
+    payload_str = "teste"
+    qos = 1
+    retain = False
+    publish_delay = 15
+     
+    run = True
+    while run:
+        client.loop()
+        
+        if(publish_delay < 1):
+            print("Publishing new data on %s" %topic)
+            payload = strftime("%a, %d %b %Y %H:%M:%S +0000, ", gmtime()) + payload_str
+            client.publish(topic, payload, qos, retain)
+            publish_delay=10
+        else:    
+            publish_delay=publish_delay-1
+        print("Remaining time for new publishing: %d" %(publish_delay))
+
 ```
 
 Depois de digitado pressione F5 e rode o programa. Lembrando que o Raspberry possui duas versões do Python e o programa só vai funcionar o que foi instalado o Paho-MQTT. Na tela do MQTTLens deverá aparecer “testing connection ok” no tópico Raspberry criado.
@@ -179,7 +293,134 @@ Esse é o último passo para o Raspberry Pi 3 conseguir enviar as informações 
 Usando o programa do último passo iremos incluir algumas coisas tais como biblioteca do sensor, qual pino está sendo usado e fazer ler a temperatura e umidade para mandar ao MQTTLens. Depois de feito tudo isso o código ficara assim:
 
 ```js
-CÓDIGO
+import paho.mqtt.client as paho
+import Adafruit_DHT
+import RPi.GPIO as GPIO
+import time
+from time import gmtime, strftime
+
+sensor = Adafruit_DHT.DHT11
+GPIO.setmode(GPIO.BOARD)
+pino_sensor = 25
+
+def rc_answers_to_strings(argument):
+    switcher = {
+        0: "Connection successful",
+        1: "Connection refused - incorrect protocol version",
+        2: "Connection refused - invalid client identifier",
+        3: "Connection refused - server unavailable",
+        4: "Connection refused - bad username or password",
+        5: "Connection refused - not authorised",
+        6-255: "Currently unused",
+    }
+    return switcher.get(argument, "nothing")
+
+def OnConnectHandler(client, userdata, flags, rc):
+        print(rc_answers_to_strings(rc))
+        
+        topic="icc_nmc"
+        qos = 1
+        
+        print("Subscribing to the topic %s with QoS %d" %(topic,qos))
+        client.subscribe(topic, qos)
+
+
+def OnDisconnecthandler(client, userdata, rc): 
+#       called when the client disconnects from the broker.
+#       The rc parameter indicates the disconnection state. If MQTT_ERR_SUCCESS
+#       (0), the callback was called in response to a disconnect() call. If any
+#       other value the disconnection was unexpected, such as might be caused by
+#       a network error.
+    print("Disconnection returned" + str(rc))
+
+def OnMessageHandler(client, userdata, message): 
+#     called when a message has been received on a
+#     topic that the client subscribes to. The message variable is a
+#     MQTTMessage that describes all of the message parameters.
+    print("###################################")
+    print("New message received:")
+    print("Topic: " + str(message.topic))
+    print("QoS: " + str(message.qos))
+    print("Payload: " + str(message.payload))
+    print("###################################")
+
+def OnPublishHandler(client, userdata, mid): 
+#       called when a message that was to be sent using the
+#       publish() call has completed transmission to the broker. For messages
+#       with QoS levels 1 and 2, this means that the appropriate handshakes have
+#       completed. For QoS 0, this simply means that the message has left the
+#       client. The mid variable matches the mid variable returned from the
+#       corresponding publish() call, to allow outgoing messages to be tracked.
+#       This callback is important because even if the publish() call returns
+#       success, it does not always mean that the message has been sent.
+    print("Publish approved!")
+
+def OnSubscribeHandler(client, userdata, mid, granted_qos): 
+#       called when the broker responds to a
+#       subscribe request. The mid variable matches the mid variable returned
+#       from the corresponding subscribe() call. The granted_qos variable is a
+#       list of integers that give the QoS level the broker has granted for each
+#       of the different subscription requests.
+    print("Subscribe successful with QoS: " + str(granted_qos))
+
+def OnUnsubscribeHandler(client, userdata, mid): 
+#     called when the broker responds to an unsubscribe
+#       request. The mid variable matches the mid variable returned from the
+#       corresponding unsubscribe() call.
+    print("Unsubscription returned ")
+
+def OnLogHandler(client, userdata, level, buf): 
+#     called when the client has log information. Define
+#       to allow debugging. The level variable gives the severity of the message
+#       and will be one of MQTT_LOG_INFO, MQTT_LOG_NOTICE, MQTT_LOG_WARNING,
+#       MQTT_LOG_ERR, and MQTT_LOG_DEBUG. The message itself is in buf.
+    print("Log: " + str(buf))
+
+
+if __name__ == '__main__':
+    
+    client = paho.Client()
+    
+    client.on_connect = OnConnectHandler
+    client.on_disconnect = OnDisconnecthandler
+    client.on_message = OnMessageHandler
+    client.on_subscribe = OnSubscribeHandler
+    client.on_publish = OnPublishHandler
+    
+    host="iot.eclipse.org"
+    port = 1883
+    keepalive=60
+    bind_address=""
+    
+    print("Trying to connect to %s" %host)
+    
+    client.connect(host, port, keepalive, bind_address)
+    
+    topic = "raspberry"
+    payload_str = "28"
+    qos = 1
+    retain = False
+    publish_delay = 10
+    
+     
+    run = True
+    while run:
+       client.loop()
+       # Efetua a leitura do sensor
+       umid, temp = Adafruit_DHT.read_retry(sensor, pino_sensor);
+       # Caso leitura esteja ok, mostra os valores na tela
+       if umid is not None and temp is not None:
+                #  time.sleep(20)
+         payload_str = ("Temperatura = {0:0.1f}  Umidade = {1:0.1f}\n").format(temp, umid);
+         payload = strftime("%a, %d %b %Y %H:%M:%S +0000, ", gmtime()) + payload_str   
+       if(publish_delay < 1):
+            print("Publishing new data on %s" %topic)
+            #payload = strftime("%a, %d %b %Y %H:%M:%S +0000, ", gmtime()) + payload_str
+            client.publish(topic, payload_str, qos, retain)
+            publish_delay=5
+       else:    
+            publish_delay=publish_delay-1
+       print("Remaining time for new publishing: %d" %(publish_delay))
 ```
 
 Depois de digitado, salve e pressione F5 para rodar o programa. A cada 5 segundos esse código mandara as informações para o MQTTLens e você vai poder visualizar de qualquer lugar.
