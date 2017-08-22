@@ -16,7 +16,7 @@ def rc_answers_to_strings(argument):
 def OnConnectHandler(client, userdata, flags, rc):
         print(rc_answers_to_strings(rc))
         
-        topic="icc_nmc"
+        topic="LabIOT"
         qos = 1
         
         print("Subscribing to the topic %s with QoS %d" %(topic,qos))
