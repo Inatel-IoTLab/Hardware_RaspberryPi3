@@ -1,5 +1,5 @@
 # Hardware_RaspberryPi3
-## Conectando Raspberry Pi 3 ao MQTTLens
+## Conectando Raspberry Pi 3 e Protocolo MQTT
 ### Caracteristicas do Raspberry
 - Raspberry Pi 3 Model B
 - Processador Broadcom BCM2837 64bit ARMv8 Cortex-A53 Quad-Core
